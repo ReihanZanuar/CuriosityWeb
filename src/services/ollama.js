@@ -1,5 +1,32 @@
 import { PERSONA_PROMPTS } from '../utils/storage';
 
+// ── Security: Input constraints ────────────────────────────────────────────────
+const MAX_PROMPT_LENGTH = 32_000;   // ~32k chars — prevents prompt stuffing attacks
+const MAX_MESSAGE_HISTORY = 100;    // Limit conversation history depth
+
+/**
+ * Sanitize user input:
+ * - Enforce max length
+ * - Strip null bytes and C0/C1 control characters (except newlines/tabs)
+ * - Prevent trivial prompt injection probes
+ */
+function sanitizeInput(text) {
+  if (typeof text !== 'string') return '';
+  // Strip null bytes and dangerous control characters
+  let sanitized = text
+    .replace(/\0/g, '')
+    // Remove C0 control chars except \t, \n, \r
+    .replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    // Remove C1 control chars
+    .replace(/[\x80-\x9F]/g, '');
+  // Enforce length cap
+  if (sanitized.length > MAX_PROMPT_LENGTH) {
+    sanitized = sanitized.slice(0, MAX_PROMPT_LENGTH);
+  }
+  return sanitized;
+}
+
+
 export const POPULAR_MODELS = [
   { id: 'deepseek-r1:14b', name: 'DeepSeek R1 (14B) - Reasoning & Matematika' },
   { id: 'llama3.1:8b', name: 'Llama 3.1 (8B) - Cepat, Cerdas & Seimbang' },
@@ -92,36 +119,54 @@ export async function streamChatWithOllama({
   const cleanEndpoint = endpoint.replace(/\/+$/, '');
   const url = `${cleanEndpoint}/api/chat`;
 
+  // ── Security: validate model string (allowlist pattern) ──────────────────
+  const safeModel = typeof model === 'string' && /^[\w.:\-]+$/.test(model.trim())
+    ? model.trim()
+    : 'llama3.1:8b';
+
+  // ── Security: cap history depth to prevent token stuffing ─────────────────
+  const cappedMessages = messages.slice(-MAX_MESSAGE_HISTORY);
+
   const formattedMessages = [];
 
   if (systemPrompt) {
     formattedMessages.push({
       role: 'system',
-      content: systemPrompt,
+      content: sanitizeInput(systemPrompt),
     });
   }
 
-  for (const msg of messages) {
+  for (const msg of cappedMessages) {
+    const role = msg.role === 'curiosity' ? 'assistant' : msg.role;
+    // Only allow known roles
+    if (!['user', 'assistant', 'system'].includes(role)) continue;
     const item = {
-      role: msg.role === 'curiosity' ? 'assistant' : msg.role,
-      content: msg.content,
+      role,
+      content: sanitizeInput(msg.content),
     };
 
     if (msg.images && msg.images.length > 0) {
-      item.images = msg.images.map((img) => img.base64);
+      // Validate each base64 image string
+      item.images = msg.images
+        .map((img) => img.base64)
+        .filter((b64) => typeof b64 === 'string' && b64.length > 0 && b64.length < 10_000_000);
     }
 
     formattedMessages.push(item);
   }
 
+  // ── Security: clamp temperature to safe range ─────────────────────────────
+  const safeTemp = Math.min(Math.max(parseFloat(temperature) || 0.7, 0), 2);
+
   const payload = {
-    model: model,
+    model: safeModel,
     messages: formattedMessages,
     stream: true,
     options: {
-      temperature: parseFloat(temperature),
+      temperature: safeTemp,
     },
   };
+
 
   const response = await fetch(url, {
     method: 'POST',

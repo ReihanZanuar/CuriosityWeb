@@ -4,54 +4,155 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # Gzip Compression
+    # ── Hide Nginx version from all responses ────────────────────────────────
+    server_tokens off;
+
+    # ── Gzip Compression ─────────────────────────────────────────────────────
     gzip on;
     gzip_vary on;
     gzip_min_length 1024;
     gzip_proxied any;
     gzip_comp_level 6;
-    gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/javascript application/xml application/json image/svg+xml;
+    gzip_types text/plain text/css text/xml text/javascript application/x-javascript
+               application/javascript application/xml application/json image/svg+xml;
 
-    # Security Headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
+    # ── Security Response Headers ─────────────────────────────────────────────
+    # Prevent embedding in frames (Clickjacking)
+    add_header X-Frame-Options "DENY" always;
+    # Prevent MIME sniffing attacks
     add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
+    # Force HTTPS for 1 year (HSTS), including subdomains
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    # Control referrer information leakage
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    # Restrict cross-origin access to powerful browser features
+    add_header Permissions-Policy "camera=(), microphone=(self), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=()" always;
+    # Cross-origin isolation headers
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+    add_header Cross-Origin-Resource-Policy "same-site" always;
+    # Prevent cross-origin embedder attacks
+    add_header Cross-Origin-Embedder-Policy "credentialless" always;
 
-    # SPA Routing (all routes fall back to index.html)
-    location / {
-        try_files $uri $uri/ /index.html;
+    # ── Content Security Policy ───────────────────────────────────────────────
+    # Restricts what resources can be loaded to prevent XSS, code injection,
+    # and data exfiltration by both modern and classic attack vectors.
+    add_header Content-Security-Policy "
+        default-src 'self';
+        script-src 'self' 'unsafe-inline' 'unsafe-eval';
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
+        font-src 'self' https://fonts.gstatic.com data:;
+        img-src 'self' data: blob:;
+        connect-src 'self';
+        media-src 'self' blob:;
+        object-src 'none';
+        frame-src 'none';
+        frame-ancestors 'none';
+        base-uri 'self';
+        form-action 'self';
+        upgrade-insecure-requests;
+    " always;
+
+    # ── Request Size Limits ───────────────────────────────────────────────────
+    # Prevent large payload injection / DoS via body size
+    client_max_body_size 20m;
+    client_body_timeout 30s;
+    client_header_timeout 15s;
+    send_timeout 60s;
+    keepalive_timeout 65s;
+
+    # ── Block known malicious paths ───────────────────────────────────────────
+    location ~* \.(php|asp|aspx|jsp|cgi|sh|bash|pl|py|rb|env|git|htaccess|htpasswd|DS_Store|log|bak|sql|conf|ini|yml|yaml|toml|lock)$ {
+        deny all;
+        return 403;
     }
 
-    # Static Assets Caching (Vite hashed bundles)
+    # Block common attack path probes
+    location ~* (wp-admin|wp-login|xmlrpc|eval|base64_decode|exec|passthru|system|phpinfo|\.git|\.svn|\.hg) {
+        deny all;
+        return 403;
+    }
+
+    # ── SPA Routing ───────────────────────────────────────────────────────────
+    location / {
+        try_files $uri $uri/ /index.html;
+        # No caching for the SPA entry point
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header Pragma "no-cache" always;
+        add_header Expires "0" always;
+    }
+
+    # ── Static Assets Caching (Vite content-hashed filenames) ─────────────────
     location /assets/ {
         expires 1y;
         add_header Cache-Control "public, immutable";
+        # No source-map exposure in production
+        location ~* \.map$ {
+            deny all;
+            return 404;
+        }
         access_log off;
     }
 
-    # Reverse Proxy to Ollama API
-    # Configured with proxy_buffering off for instant token streaming
-    location /ollama/ {
-        proxy_pass ${OLLAMA_BACKEND_URL}/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+    # ── Public files (logo, favicon, icons) ──────────────────────────────────
+    location ~* \.(png|jpg|jpeg|webp|gif|svg|ico|woff|woff2|ttf|eot)$ {
+        expires 30d;
+        add_header Cache-Control "public, max-age=2592000";
+        access_log off;
+    }
 
-        # Disable buffering for real-time LLM token streaming
+    # ── Ollama API Reverse Proxy ──────────────────────────────────────────────
+    # Only allowed paths: /api/chat and /api/tags — nothing else.
+    location = /ollama/api/tags {
+        proxy_pass ${OLLAMA_BACKEND_URL}/api/tags;
+        proxy_http_version 1.1;
+        proxy_set_header Host $proxy_host;
+        proxy_set_header X-Real-IP "";
+        proxy_set_header X-Forwarded-For "";
+        proxy_set_header X-Forwarded-Proto "";
+        proxy_pass_request_headers off;
+        proxy_set_header Content-Type application/json;
+        proxy_read_timeout 10s;
+        proxy_connect_timeout 5s;
+        proxy_buffering on;
+        proxy_cache off;
+        proxy_hide_header X-Powered-By;
+        proxy_hide_header Server;
+    }
+
+    location = /ollama/api/chat {
+        proxy_pass ${OLLAMA_BACKEND_URL}/api/chat;
+        proxy_http_version 1.1;
+        proxy_set_header Host $proxy_host;
+        proxy_set_header X-Real-IP "";
+        proxy_set_header X-Forwarded-For "";
+        proxy_set_header X-Forwarded-Proto "";
+        proxy_pass_request_headers off;
+        proxy_set_header Content-Type application/json;
         proxy_buffering off;
         proxy_cache off;
         proxy_read_timeout 600s;
         proxy_send_timeout 600s;
         proxy_connect_timeout 30s;
+        proxy_hide_header X-Powered-By;
+        proxy_hide_header Server;
     }
 
-    # Health check endpoint
-    location /healthz {
+    # Block all other /ollama/* paths
+    location /ollama/ {
+        deny all;
+        return 403;
+    }
+
+    # ── Health check endpoint ─────────────────────────────────────────────────
+    location = /healthz {
         access_log off;
         return 200 'OK';
         add_header Content-Type text/plain;
+    }
+
+    # ── Deny access to dot-files ──────────────────────────────────────────────
+    location ~ /\. {
+        deny all;
+        return 404;
     }
 }

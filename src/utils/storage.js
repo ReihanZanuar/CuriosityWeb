@@ -3,12 +3,12 @@ const SETTINGS_KEY = 'curiosity_app_settings_v2';
 
 export const ENDPOINT_PRESETS = [
   {
-    id: 'tailscale',
-    name: 'Tailscale (Pengembangan Aktif)',
+    id: 'server',
+    name: 'Server LLM (10.99.98.47)',
     endpoint: '/ollama',
-    rawHost: 'http://100.104.58.74:11434',
-    badge: '100.104.58.74:11434',
-    desc: 'Terhubung ke server Ollama via Tailscale',
+    rawHost: 'http://10.99.98.47:11434',
+    badge: '10.99.98.47:11434',
+    desc: 'Terhubung ke server Ollama 10.99.98.47:11434',
   },
   {
     id: 'localhost',

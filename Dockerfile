@@ -21,7 +21,7 @@ RUN npm run build
 FROM nginx:1.27-alpine
 
 # Set default Ollama backend URL (can be overridden at runtime via ENV / docker-compose)
-ENV OLLAMA_BACKEND_URL=http://host.docker.internal:11434
+ENV OLLAMA_BACKEND_URL=http://10.99.98.47:11434
 
 # Copy built assets from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html

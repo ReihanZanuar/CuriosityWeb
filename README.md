@@ -82,8 +82,7 @@ docker build -t curiosity-web:latest .
 docker run -d \
   --name curiosity-web \
   -p 8080:80 \
-  -e OLLAMA_BACKEND_URL=http://host.docker.internal:11434 \
-  --add-host=host.docker.internal:host-gateway \
+  -e OLLAMA_BACKEND_URL=http://10.99.98.47:11434 \
   --restart unless-stopped \
   curiosity-web:latest
 ```

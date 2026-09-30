@@ -9,7 +9,7 @@ services:
     ports:
       - "5173:5173"
     environment:
-      - VITE_OLLAMA_PROXY_TARGET=${VITE_OLLAMA_PROXY_TARGET:-http://host.docker.internal:11434}
+      - VITE_OLLAMA_PROXY_TARGET=${VITE_OLLAMA_PROXY_TARGET:-http://10.99.98.47:11434}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"

@@ -8,7 +8,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/ollama': {
-        target: process.env.VITE_OLLAMA_PROXY_TARGET || 'http://100.104.58.74:11434',
+        target: process.env.VITE_OLLAMA_PROXY_TARGET || 'http://10.99.98.47:11434',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/ollama/, ''),
         configure: (proxy) => {

@@ -59,19 +59,56 @@ npm run dev
 ```
 Buka browser di: **`http://localhost:5173`**
 
-### 2. Menjalankan Ollama Lokal
-Untuk performa AI penuh secara offline tanpa kuota:
-1. Unduh dan pasang Ollama dari [ollama.com](https://ollama.com).
-2. Buka Terminal / Command Prompt lalu jalankan model pilihanmu:
+### 2. Menjalankan dengan Docker & Docker Compose (Production & Server)
+
+Aplikasi ini sudah siap di-deploy dan di-*mount* pada server production berbasis Docker:
+
+#### A. Menjalankan Langsung dengan Docker Compose
 ```bash
-# Model Cepat & Ringan (Rekomendasi untuk PR & Belajar Harian):
-ollama run llama3.2
+# 1. Salin konfigurasi environment (opsional)
+cp .env.example .env
 
-# Model Vision (Bisa membaca foto PR & gambar diagram):
-ollama run llama3.2-vision
+# 2. Jalankan container production
+docker compose up -d --build
+```
+Akses aplikasi melalui browser di **`http://localhost:8080`** (atau port yang ditentukan di file `.env`).
 
-# Model Penalaran & Matematika Super (DeepSeek R1):
-ollama run deepseek-r1:8b
+#### B. Menjalankan Manual dengan Docker CLI
+```bash
+# Build Docker image
+docker build -t curiosity-web:latest .
+
+# Jalankan container (mengarah ke Ollama di host)
+docker run -d \
+  --name curiosity-web \
+  -p 8080:80 \
+  -e OLLAMA_BACKEND_URL=http://host.docker.internal:11434 \
+  --add-host=host.docker.internal:host-gateway \
+  --restart unless-stopped \
+  curiosity-web:latest
+```
+
+#### C. Mode Development Mount (Hot-Reloading di dalam Docker)
+Jika ingin melakukan pengeditan kode secara langsung (*live mount*):
+```bash
+docker compose -f docker-compose.dev.yml up
+```
+
+---
+
+### 3. Menjalankan Ollama Backend
+Untuk performa AI penuh:
+1. Unduh dan pasang Ollama dari [ollama.com](https://ollama.com).
+2. Jalankan model pilihan:
+```bash
+# Model Cepat & Ringan:
+ollama run llama3.1:8b
+
+# Model Vision (Foto PR & Diagram):
+ollama run gemma4:e4b
+
+# Model Penalaran STEM & Matematika (DeepSeek R1):
+ollama run deepseek-r1:14b
 ```
 
 ---

@@ -1,0 +1,19 @@
+services:
+  curiosity-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: curiosity-web
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:80"
+    environment:
+      # URL target backend Ollama (gunakan host.docker.internal, IP LAN, atau IP Tailscale)
+      - OLLAMA_BACKEND_URL=${OLLAMA_BACKEND_URL:-http://host.docker.internal:11434}
+    extra_hosts:
+      # Memungkinkan container menjangkau service di host server (Ollama)
+      - "host.docker.internal:host-gateway"
+    # Opsi volume jika ingin me-mount folder dist secara langsung di server production:
+    # volumes:
+    #   - ./dist:/usr/share/nginx/html:ro
+    #   - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro

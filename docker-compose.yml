@@ -13,7 +13,25 @@ services:
     extra_hosts:
       # Memungkinkan container menjangkau service di host server (Ollama)
       - "host.docker.internal:host-gateway"
+    networks:
+      - curiosity-net
     # Opsi volume jika ingin me-mount folder dist secara langsung di server production:
     # volumes:
     #   - ./dist:/usr/share/nginx/html:ro
     #   - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: curiosity-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - curiosity-web
+    networks:
+      - curiosity-net
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+
+networks:
+  curiosity-net:
+    driver: bridge

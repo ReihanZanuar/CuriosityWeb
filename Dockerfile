@@ -1,13 +1,13 @@
 # ==========================================
 # STAGE 1: Build Vite / React Frontend
 # ==========================================
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
 # Install dependencies with clean cache
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install --frozen-lockfile || npm install
 
 # Copy application source
 COPY . .

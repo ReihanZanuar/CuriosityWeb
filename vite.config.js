@@ -7,9 +7,7 @@ export default defineConfig({
   build: {
     // Disable source maps in production — prevents code inspection via DevTools
     sourcemap: false,
-    // Remove console.* and debugger statements in production bundle
-    minify: 'esbuild',
-    target: 'es2018',
+    minify: true,
     rollupOptions: {
       output: {
         // Obfuscate chunk names so file structure is harder to reverse-engineer
